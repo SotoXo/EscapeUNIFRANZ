@@ -1,2 +1,4 @@
 ﻿<Solution>
+  <Project Path="EscapeUNIFRANZ.Runtime.csproj" />
+  <Project Path="EscapeUNIFRANZ.Tests.EditMode.csproj" />
 </Solution>
