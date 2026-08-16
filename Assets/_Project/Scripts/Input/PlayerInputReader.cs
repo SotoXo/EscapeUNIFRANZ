@@ -1,10 +1,12 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 
 namespace EscapeUNIFRANZ.Input
 {
     /// <summary>
-    /// Reads the configured movement action and exposes the current player intent.
+    /// Reads the configured gameplay actions and exposes player intent as state or events.
     /// </summary>
     public sealed class PlayerInputReader : MonoBehaviour
     {
@@ -12,59 +14,94 @@ namespace EscapeUNIFRANZ.Input
         [Tooltip("Assign InputSystem_Actions/Player/Move (Value, Vector2).")]
         private InputActionReference moveAction;
 
-        private InputAction subscribedAction;
-        private bool enabledActionLocally;
+        [SerializeField]
+        [Tooltip("Assign InputSystem_Actions/Player/Interact (Button, E).")]
+        private InputActionReference interactAction;
+
+        private InputAction subscribedMoveAction;
+        private InputAction subscribedInteractAction;
+        private bool enabledMoveActionLocally;
+        private bool enabledInteractActionLocally;
 
         public Vector2 MoveInput { get; private set; }
+        public event Action InteractPressed;
 
         private void OnEnable()
         {
-            if (moveAction == null || moveAction.action == null)
+            if (moveAction == null || moveAction.action == null ||
+                interactAction == null || interactAction.action == null)
             {
                 Debug.LogError(
-                    $"{nameof(PlayerInputReader)} on '{name}' requires a Move InputActionReference.",
+                    $"{nameof(PlayerInputReader)} on '{name}' requires Move and Interact InputActionReferences.",
                     this);
                 enabled = false;
                 return;
             }
 
-            subscribedAction = moveAction.action;
-            subscribedAction.performed += OnMoveChanged;
-            subscribedAction.canceled += OnMoveChanged;
+            subscribedMoveAction = moveAction.action;
+            subscribedInteractAction = interactAction.action;
 
-            enabledActionLocally = !subscribedAction.enabled;
-            if (enabledActionLocally)
+            subscribedMoveAction.performed += OnMoveChanged;
+            subscribedMoveAction.canceled += OnMoveChanged;
+            subscribedInteractAction.started += OnInteractStarted;
+
+            enabledMoveActionLocally = !subscribedMoveAction.enabled;
+            if (enabledMoveActionLocally)
             {
-                subscribedAction.Enable();
+                subscribedMoveAction.Enable();
             }
 
-            MoveInput = subscribedAction.ReadValue<Vector2>();
+            enabledInteractActionLocally = !subscribedInteractAction.enabled;
+            if (enabledInteractActionLocally)
+            {
+                subscribedInteractAction.Enable();
+            }
+
+            MoveInput = subscribedMoveAction.ReadValue<Vector2>();
         }
 
         private void OnDisable()
         {
             MoveInput = Vector2.zero;
 
-            if (subscribedAction == null)
+            if (subscribedMoveAction != null)
             {
-                return;
+                subscribedMoveAction.performed -= OnMoveChanged;
+                subscribedMoveAction.canceled -= OnMoveChanged;
+
+                if (enabledMoveActionLocally)
+                {
+                    subscribedMoveAction.Disable();
+                }
             }
 
-            subscribedAction.performed -= OnMoveChanged;
-            subscribedAction.canceled -= OnMoveChanged;
-
-            if (enabledActionLocally)
+            if (subscribedInteractAction != null)
             {
-                subscribedAction.Disable();
+                subscribedInteractAction.started -= OnInteractStarted;
+
+                if (enabledInteractActionLocally)
+                {
+                    subscribedInteractAction.Disable();
+                }
             }
 
-            subscribedAction = null;
-            enabledActionLocally = false;
+            subscribedMoveAction = null;
+            subscribedInteractAction = null;
+            enabledMoveActionLocally = false;
+            enabledInteractActionLocally = false;
         }
 
         private void OnMoveChanged(InputAction.CallbackContext context)
         {
             MoveInput = context.ReadValue<Vector2>();
+        }
+
+        private void OnInteractStarted(InputAction.CallbackContext context)
+        {
+            if (context.control is KeyControl key && key.keyCode == Key.E)
+            {
+                InteractPressed?.Invoke();
+            }
         }
     }
 }
